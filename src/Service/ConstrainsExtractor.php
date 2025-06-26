@@ -11,9 +11,6 @@ use Symfony\Component\Validator\Mapping\ClassMetadata;
 use Symfony\Component\Validator\Mapping\PropertyMetadataInterface;
 use Symfony\Component\Validator\Constraints\Collection;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
-use ReflectionClass;
-use ReflectionProperty;
-use ReflectionAttribute;
 
 final class ConstrainsExtractor
 {
@@ -30,23 +27,19 @@ final class ConstrainsExtractor
 
     public function extract(string $class): Collection
     {
-        $reflectionClass = new ReflectionClass($class);
-
+        $meta = $this->validator->getMetadataFor($class);
         // Collecting constraints
-        $constraints = [];
-        foreach ($reflectionClass->getProperties() as $property) {
-            $attributes = $property->getAttributes(Constraint::class, ReflectionAttribute::IS_INSTANCEOF);
-            $attributes = array_map(fn (ReflectionAttribute $attribute) => $attribute->newInstance(), $attributes);
+        $constraints = array_map(
+            fn (PropertyMetadataInterface $property): array => $property->getConstraints(),
+            $meta->properties
+        );
 
-            $constraints[$property->getName()] = $attributes;
-        }
-
-        $allowExtraFields = $reflectionClass->getAttributes(AllowExtraFields::class);
+        $allowExtraFields = $meta->getReflectionClass()->getAttributes(AllowExtraFields::class);
         $allowExtraFields = $allowExtraFields
             ? $allowExtraFields[0]->newInstance()
             : new AllowExtraFields(true);
 
-        $allowMissingFields = $reflectionClass->getAttributes(AllowMissingFields::class);
+        $allowMissingFields = $meta->getReflectionClass()->getAttributes(AllowMissingFields::class);
         $allowMissingFields = $allowMissingFields
             ? $allowMissingFields[0]->newInstance()
             : new AllowMissingFields(false);
