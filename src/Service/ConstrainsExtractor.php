@@ -7,8 +7,8 @@ namespace N7\SymfonyValidatorsBundle\Service;
 use N7\SymfonyValidatorsBundle\Options\AllowExtraFields;
 use N7\SymfonyValidatorsBundle\Options\AllowMissingFields;
 use Symfony\Component\Validator\Constraint;
-use Symfony\Component\Validator\Mapping\ClassMetadata;
-use Symfony\Component\Validator\Mapping\PropertyMetadataInterface;
+use Symfony\Component\Validator\Mapping\ClassMetadataInterface;
+use Symfony\Component\Validator\Mapping\PropertyMetadata;
 use Symfony\Component\Validator\Constraints\Collection;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -30,8 +30,8 @@ final class ConstrainsExtractor
         $meta = $this->validator->getMetadataFor($class);
         // Collecting constraints
         $constraints = array_map(
-            fn (PropertyMetadataInterface $property): array => $property->getConstraints(),
-            $meta->properties
+            fn (PropertyMetadata $property): array => $property->getConstraints(),
+            $this->getPropertiesMetadata($meta)
         );
 
         $allowExtraFields = $meta->getReflectionClass()->getAttributes(AllowExtraFields::class);
@@ -49,5 +49,25 @@ final class ConstrainsExtractor
             self::VALIDATIOR_ALLOW_MISSING_FIELDS => $allowMissingFields->getValue(),
             self::VALIDATIOR_FIELDS => $constraints,
         ]);
+    }
+
+    /**
+     * Replacement for ClassMetadata::$properties, which is private since symfony/validator 7.4.
+     *
+     * @return PropertyMetadata[]
+     */
+    private function getPropertiesMetadata(ClassMetadataInterface $meta): array
+    {
+        $properties = [];
+        foreach ($meta->getConstrainedProperties() as $property) {
+            foreach ($meta->getPropertyMetadata($property) as $member) {
+                if ($member instanceof PropertyMetadata) {
+                    $properties[$property] = $member;
+                    break;
+                }
+            }
+        }
+
+        return $properties;
     }
 }
